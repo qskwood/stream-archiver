@@ -1,0 +1,52 @@
+# REQUIRES
+# torsocks, curl, jq, recode, mail, and streamlink
+
+download_twitch(){
+  local channelid
+  channelid="${1}"
+
+  id="$(curl -H 'Accept: application/vnd.twitchtv.v5+json' -H "Client-ID: $(jq -r '.twitch.key' ${TESTROOT}/etc/stream-archiver/apis.json)" -s "https://api.twitch.tv/kraken/streams/?channel=${channelid}" | jq -r '.streams[0]._id' 2> /dev/null)"
+  if [[ -z "${id}" || "${id}" == "null" ]]; then
+    return 1
+  fi
+
+  # Here is where you can modify the title of videos. I recommend at least leaving the recode line.
+  # I use the iconv conversion to remove emojis, tr to truncate the resulting spaces to one space, sed to modify some titles for the broadcaster I archive, and recode to change HTML-encoded things back to ASCII.
+  title="$(curl -H 'Accept: application/vnd.twitchtv.v5+json' -H "Client-ID: $(jq -r '.twitch.key' ${TESTROOT}/etc/stream-archiver/apis.json)" -s "https://api.twitch.tv/kraken/streams/?channel=${channelid}" | jq -r '.streams[0].channel.status' 2> /dev/null |\
+           iconv -c -f utf-8 -t ascii |\
+           tr -s " " |\
+           sed -e 's|\([0-9]*\)/|\1-|g' -e 's/\( |\)\{1,\}/\1/' -e 's/ | $//' |\
+           recode html..ascii)"
+
+  if [[ ! -d Twitch ]]; then
+    mkdir Twitch
+  fi
+
+  echo "Twitch: ${title}" > "Twitch/${id}-${timestamp}.title"
+  echo "Original Date: ${timestamp}" > "Twitch/${id}-${timestamp}.description"
+
+  parts_complete=$(find ./Twitch -maxdepth 1 -name '*.ts' | grep -c -- "${id}")
+
+  channelname="$(curl -H 'Accept: application/vnd.twitchtv.v5+json' -H "Client-ID: $(jq -r '.twitch.key' ${TESTROOT}/etc/stream-archiver/apis.json)" -s "https://api.twitch.tv/kraken/streams/?channel=${channelid}" | jq -r '.streams[0].channel.display_name' 2> /dev/null)"
+
+  if [[ ${parts_complete} -eq 0 ]]; then
+    echo "Twitch: ${id}-${timestamp} downloading" | mail -s "Cron <qskwood@test> /mnt/stream-archiver-master/opt/stream-archiver/stream-downloader" "${LOGNAME}"; streamlink --hls-duration "5:55:00" -o "Twitch/${id}-${timestamp}.ts.tmp" "https://www.twitch.tv/${channelname}" best >> ${TESTROOT}/var/log/stream-archiver/downloader-twitch.log
+  else
+    sed -i "s/Twitch\(.*\)/Twitch\1 Part $((${parts_complete}+1))/" Twitch/${id}-${timestamp}.title
+    echo "Twitch: ${id}-${timestamp} continued downloading" | mail -s "Cron <qskwood@test> /mnt/stream-archiver-master/opt/stream-archiver/stream-downloader" "${LOGNAME}"; streamlink --hls-duration "5:55:00" -o "Twitch/${id}-${timestamp}.ts.tmp" "https://www.twitch.tv/${channelname}" best >> ${TESTROOT}/var/log/stream-archiver/downloader-twitch.log
+  fi
+
+  if [[ ! -e "Twitch/${id}-${timestamp}.ts.tmp" ]]; then
+    rm "Twitch/${id}-${timestamp}.title"
+    rm "Twitch/${id}-${timestamp}.description"
+    return 1
+  fi
+
+  mv "Twitch/${id}-${timestamp}.ts.tmp" "Twitch/${id}-${timestamp}.ts"
+
+  echo "Twitch: ${id}-${timestamp} downloaded" | grep -v null
+
+  echo "$(df -h --output=avail /dev/sda1) disk space available" | tail -n 1 | cut -d " " -f 2- | sed 's/^ //'
+
+  exit
+}

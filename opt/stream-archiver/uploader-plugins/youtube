@@ -1,0 +1,25 @@
+# REQUIRES
+# ffprobe, bc, youtubeuploader
+# https://github.com/porjo/youtubeuploader
+# Generate request.token and place in /var/spool/stream-archiver/request.token
+upload_youtube(){
+local site
+site="${1}"
+
+find . -name '*.ts' | sort > ytuploadqueue
+
+if [[ ! -e playlist.json ]]; then
+  echo "{\"playlistTItles\":[\"${site}\"]}" > meta.json
+fi
+
+while read fname; do
+  if [ $(awk '{print length}' "$(basename "${fname}" .ts).title" | sort -nu | tail -n 1) -gt 100 ]; then
+    echo WARNING: Title too long
+  fi
+  if youtubeuploader_linux_amd64 -secrets "${TESTROOT}/etc/stream-archiver/client_secrets.json" -cache "${TESTROOT}/var/spool/stream-archiver/request.token" -title "$(cat "$(basename "${fname}" .ts).title" | cut -c -100)" -description "$(cat "$(basename "${fname}" .ts).description")" -metaJSON meta.json -filename "${fname}" -privacy private > /dev/null 2>> "${TESTROOT}/var/log/stream-archiver/uploader-youtube.log"; then
+    mv "${fname}" "${fname}.up"
+  fi
+done < ytuploadqueue
+
+rm ytuploadqueue
+}

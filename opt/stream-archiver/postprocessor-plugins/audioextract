@@ -1,0 +1,12 @@
+postprocess_audioextract(){
+  find . -name '*.ts' | grep -v muted | sort > aepostprocessqueue
+  while read fname; do
+    if [ ! -e "$(basename "${fname}" .ts).mp3" ]; then
+      if ffmpeg -f mpegts -i "${fname}" -vcodec null -f mp3 "$(basename "${fname}" .ts).mp3.tmp" > /dev/null 2> /dev/null; then
+        mv "$(basename "${fname}" .ts).mp3.tmp" "$(basename "${fname}" .ts).mp3"
+      fi
+    fi
+  done < aepostprocessqueue
+
+  rm aepostprocessqueue
+}

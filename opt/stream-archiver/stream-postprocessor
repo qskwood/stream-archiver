@@ -1,0 +1,27 @@
+#!/bin/bash
+#set -x
+
+PATH="/usr/local/bin:${PATH}"
+
+# Leave empty on a non-test system.
+TESTROOT="/opt/stream-archiver-master"
+
+umask g+rw
+
+if ! exec 200>"${TESTROOT}/tmp/stream-postprocessor.lock"; then
+  echo "Could not create lockfile" 1>&2
+  exit 1
+fi
+if ! flock -n 200; then
+  exit
+fi
+trap "rm -f \"${TESTROOT}/tmp/stream-postprocessor.lock\"" EXIT
+
+cd "${TESTROOT}/var/spool/stream-archiver" || exit
+
+timestamp="$(TZ=America/Chicago date "+%FT%Hh%Mm%Ss%z")"
+
+source "${TESTROOT}/opt/stream-archiver/postprocessor-plugins/audioextract"
+
+cd Mixer && postprocess_audioextract
+cd ../YouTube && postprocess_audioextract

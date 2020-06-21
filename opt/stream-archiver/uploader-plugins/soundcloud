@@ -1,0 +1,14 @@
+# REQUIRES curl
+upload_soundcloud(){
+  find . -name '*.mp3' | grep -v muted | sort > scuploadqueue
+  while read fname; do
+    uploadresult=$(curl -X POST -s "https://api.soundcloud.com/tracks" -F "oauth_token=$(jq -r '.soundcloud.key' ${TESTROOT}/etc/stream-archiver/apis.json)" -F "track[asset_data]=@${fname}" -F "track[title]=$(cat $(basename "${fname}" .mp3).title)" -F "track[description]=$(cat $(basename "${fname}" .mp3).description)" -F "track[downloadable]=true")
+    if [ ! $(echo "${uploadresult}" | grep -cim 1 error) -eq 1 ];
+      then
+        mv "${fname}" "${fname}.up"
+      else
+        echo "${uploadresult}"
+    fi
+  done < scuploadqueue
+rm scuploadqueue
+}

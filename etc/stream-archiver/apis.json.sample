@@ -1,0 +1,11 @@
+{
+  "soundcloud": {
+    "key":"foo"
+  },
+  "twitch": {
+    "key":"bar"
+  },
+  "youtube": {
+    "key":"baz"
+  }
+}

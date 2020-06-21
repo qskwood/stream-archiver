@@ -1,0 +1,1 @@
+This is the directory where downloading, downloaded, and post-processed stream archives (like audio-only versions) are stored. A youtube-upload-credentials.json file for YouTube uploads can be stored here if that plugin is used.

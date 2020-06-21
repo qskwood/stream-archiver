@@ -1,0 +1,63 @@
+# REQUIRES
+# torsocks, curl, jq, recode, mail, and streamlink
+
+download_youtube(){
+  local channelid
+  channelid="${1}"
+
+  if ! torsocks streamlink "https://www.youtube.com/channel/${channelid}/live" > /dev/null 2> /dev/null; then
+    return 1
+  fi
+
+  snippet="$(curl -s "https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelid}&type=video&eventType=live&key=$(jq -r '.youtube.key' ${TESTROOT}/etc/stream-archiver/apis.json)")"
+
+  id="$(echo "${snippet}" | jq -r '.items[0].id.videoId')"
+  if [[ -z "${id}" || "${id}" == "null" ]]; then
+    return 1
+  fi
+
+  # Here is where you can modify the title of videos. I recommend at least leaving the recode line.
+  # I use the iconv conversion to remove emojis, tr to truncate the resulting spaces to one space, sed to modify some titles for the broadcaster I archive, and recode to change HTML-encoded things back to ASCII.
+  title="$(echo "${snippet}" | jq -r '.items[0].snippet.title' |\
+           iconv -c -f utf-8 -t ascii |\
+           tr -s " " |\
+           sed -e 's|\([0-9]*\)/|\1-|g' -e 's/\( |\)\{1,\}/\1/' -e 's/ | $//' |\
+           recode html..ascii)"
+
+  if [[ ! -d YouTube ]]; then
+    mkdir YouTube
+  fi
+
+  echo "YouTube: ${title}" > "YouTube/${timestamp}-${id}.title"
+  echo "Original Date: ${timestamp}" > "YouTube/${timestamp}-${id}.description"
+
+  parts_complete=$(find ./YouTube -maxdepth 1 -name '*.ts' | grep -c -- "${id}")
+
+  if [[ ${parts_complete} -eq 0 ]]; then
+    echo "YouTube: ${timestamp}-${id} downloading" | mail -s "Cron <qskwood@test> /mnt/stream-archiver-master/opt/stream-archiver/stream-downloader" "${LOGNAME}"; streamlink --hls-duration "5:55:00" --hls-live-restart -o "YouTube/${timestamp}-${id}.ts.tmp" "https://www.youtube.com/watch?v=${id}" best >> ${TESTROOT}/var/log/stream-archiver/downloader-youtube.log
+  else
+    sed -i "s/YouTube\(.*\)/YouTube\1 Part $((${parts_complete}+1))/" YouTube/${timestamp}-${id}.title
+    echo "YouTube: ${timestamp}-${id} continued downloading" | mail -s "Cron <qskwood@test> /mnt/stream-archiver-master/opt/stream-archiver/stream-downloader" "${LOGNAME}"; /usr/local/bin/streamlink --hls-duration "5:55:00" --hls-live-edge 45 -o "YouTube/${timestamp}-${id}.ts.tmp" "https://www.youtube.com/watch?v=${id}" best >> ${TESTROOT}/var/log/stream-archiver/downloader-youtube.log
+  fi
+
+  if [[ ! -e "YouTube/${timestamp}-${id}.ts.tmp" ]]; then
+    rm "YouTube/${timestamp}-${id}.title"
+    rm "YouTube/${timestamp}-${id}.description"
+    return 1
+  fi
+
+  length=$(ffprobe -f mpegts "YouTube/${timestamp}-${id}.ts.tmp" 2>&1 | grep Duration | sed -e 's/.*Duration: //' -e 's/\..*//')
+  length_seconds=$(echo $(echo ${length} | cut -d : -f 1)*60*60+$(echo ${length} | cut -d : -f 2)*60+$(echo ${length} | cut -d : -f 3) | bc)
+  if [[ ${length_seconds} -gt 7199 && ${length_seconds} -lt 7210 ]]; then
+    echo "YouTube: ${timestamp}-${id} is likely DVR."
+    mv "YouTube/${timestamp}-${id}.ts.tmp" "YouTube/${timestamp}-${id}.dvr"
+  else
+    mv "YouTube/${timestamp}-${id}.ts.tmp" "YouTube/${timestamp}-${id}.ts"
+  fi
+
+  echo "YouTube: ${timestamp}-${id} downloaded" | grep -v null
+
+  echo "$(df -h --output=avail /dev/sdb1) disk space available" | tail -n 1 | cut -d " " -f 2- | sed 's/^ //'
+
+  exit
+}

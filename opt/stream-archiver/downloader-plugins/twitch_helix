@@ -28,7 +28,7 @@ download_twitch_helix(){
     mkdir Twitch
   fi
 
-  echo "Twitch: ${title}" > "Twitch/${id}-${timestamp}.title"
+  echo "Twitch: ${channelname}: ${title}" > "Twitch/${id}-${timestamp}.title"
   echo "Original Date: ${timestamp}" > "Twitch/${id}-${timestamp}.description"
 
   parts_complete=$(find ./Twitch -maxdepth 1 -name '*.ts' | grep -c -- "${id}")

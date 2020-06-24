@@ -28,7 +28,7 @@ download_youtube(){
     mkdir YouTube
   fi
 
-  echo "YouTube: ${title}" > "YouTube/${timestamp}-${id}.title"
+  echo "YouTube: ${channelid}: ${title}" > "YouTube/${timestamp}-${id}.title"
   echo "Original Date: ${timestamp}" > "YouTube/${timestamp}-${id}.description"
 
   parts_complete=$(find ./YouTube -maxdepth 1 -name '*.ts' | grep -c -- "${id}")

@@ -3,7 +3,8 @@
     "key":"foo"
   },
   "twitch": {
-    "key":"bar"
+    "key":"bar",
+    "secret":"qux"
   },
   "youtube": {
     "key":"baz"

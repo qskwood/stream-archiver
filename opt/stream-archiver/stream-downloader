@@ -21,8 +21,7 @@ cd "${TESTROOT}/var/spool/stream-archiver" || exit
 
 timestamp="$(TZ=America/Chicago date "+%FT%Hh%Mm%Ss%z")"
 
-source "${TESTROOT}/opt/stream-archiver/downloader-plugins/mixer"
 source "${TESTROOT}/opt/stream-archiver/downloader-plugins/twitch"
-source "${TESTROOT}/opt/stream-archiver/downloader-plugins/youtube"
+source "${TESTROOT}/opt/stream-archiver/downloader-plugins/twitch_helix"
 
-download_twitch 39046428
+download_twitch_helix lancunyt

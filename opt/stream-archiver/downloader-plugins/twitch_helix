@@ -10,7 +10,7 @@ download_twitch_helix(){
     curl -s -X POST "https://id.twitch.tv/oauth2/token?client_id=$(jq -r '.twitch.key' ${TESTROOT}/etc/stream-archiver/apis.json)&client_secret=$(jq -r '.twitch.secret' ${TESTROOT}/etc/stream-archiver/apis.json)&grant_type=client_credentials" | jq -r '.access_token' > ${TESTROOT}/var/spool/stream-archiver/twitch.token
   fi
 
-  id="$(curl -s -H "Client-ID: $(jq -r '.twitch.key' ${TESTROOT}/etc/stream-archiver/apis.json)" -H "Authorization: Bearer $(cat ${TESTROOT}/var/spool/stream-archiver/twitch.token)" -X GET "https://api.twitch.tv/helix/streams/?user_login=${channelname}" | jq -r '.data[0].id')"
+  id="$(curl -s -H "Client-ID: $(jq -r '.twitch.key' ${TESTROOT}/etc/stream-archiver/apis.json)" -H "Authorization: Bearer $(cat ${TESTROOT}/var/spool/stream-archiver/twitch.token)" -X GET "https://api.twitch.tv/helix/streams/?user_login=${channelname}" | jq -r '.data[0].id' 2> /dev/null)"
   if [[ -z "${id}" || "${id}" == "null" ]]; then
     return 1
   fi
